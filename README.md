@@ -9,4 +9,5 @@ For Docker based Computer Use (Beta), please visit https://github.com/anthropics
 '''
 Error: Client initialization failed: Failed to validate API key: 'Beta' object has no attribute 'messages'
 '''
+
 -> pip install --upgrade anthropic
