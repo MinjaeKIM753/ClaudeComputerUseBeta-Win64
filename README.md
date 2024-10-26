@@ -2,7 +2,9 @@
 
 Beta trial code for the **Claude 3.5 Sonnet Computer Use (Beta) on __Win64__**.
 
-As noted in the [Anthropic Computer Use (Beta) Documentation](https://docs.anthropic.com/en/docs/build-with-claude/computer-use), it is recommended that the Computer Use to be ran in Virtual Machines. 
+⚠️ **WARNING**: It is HIGHLY RECOMMENDED to run this application in a virtual machine environment for security and isolation purposes. Running this on your local machine directly carries potential security risks.
+
+As noted in the [Anthropic Computer Use (Beta) Documentation](https://docs.anthropic.com/en/docs/build-with-claude/computer-use), it is recommended that the Computer Use be run in Virtual Machines. 
 
 For Docker based Computer Use (Beta), please visit [Anthropic Computer Use (Beta)](https://github.com/anthropics/anthropic-quickstarts/tree/main/computer-use-demo).
 
@@ -10,74 +12,46 @@ Participation is welcomed. Currently facing many issues with calibration of the 
 
 ## Installation and Setup
 
-1. Clone the repository:
+### Recommended: Using a Virtual Machine
+
+1. Set up a virtual machine using software like VMware or VirtualBox.
+
+2. Clone the repository in your virtual machine:
    ```
    git clone https://github.com/MinjaeKIM753/ClaudeComputerUseBeta-Win64.git
    cd ClaudeComputerUseBeta-Win64
    ```
 
-2. Create a virtual environment (optional but recommended):
-   ```
-   python -m venv venv
-   ```
-
-3. Activate the virtual environment:
-   - On Windows:
-     ```
-     venv\Scripts\activate
-     ```
-   - On macOS and Linux:
-     ```
-     source venv/bin/activate
-     ```
-
-4. Install the required packages:
+3. Install the required packages:
    ```
    pip install -r requirements.txt
    ```
 
-5. Set up your Anthropic API key:
+4. Set up your Anthropic API key:
    - Create a `.env` file in the project root directory
    - Add your API key to the file:
      ```
      ANTHROPIC_API_KEY=your_api_key_here
      ```
+   - Alternatively, you can set it as an environment variable in your virtual machine for ease of use:
+     ```
+     export ANTHROPIC_API_KEY=your_api_key_here
+     ```
 
-6. Run the application:
+### Alternative: Local Machine (Not Recommended)
+
+If you choose to run on your local machine despite the risks:
+
+1. Follow steps 2-4 from the virtual machine setup.
+
+2. It's strongly advised to use a virtual environment:
    ```
-   python main.py
+   python -m venv venv
+   source venv/bin/activate  # On Windows use: venv\Scripts\activate
    ```
 
-Note: Make sure you have Python 3.7 or higher installed on your system.
+Note: Ensure you have Python 3.7 or higher installed on your system.
 
-## Usage
+## Running the Application
 
-### Step 1. Initialize with API Key
-
-Insert your Claude API Key in the main window, and press Initialize.
-
-![Before_initialize](./img/CCMP1.png)
-![After_initialize](./img/CCMP1-1.png)
-
-### Step 2. Submit Your Prompt
-
-Write your prompt in the input box and press Submit.
-
-![Processing](./img/CCMP2.png)
-
-## Current Status
-
-- Errors in correctly locating the cursor. This may be due to image downscaling (due to token length limit)
-- Errors in identifying whether the goal has been achieved.
-- Currently taking two screenshots at the beginning of the task. 
-- Need calibration of the awaiting time for the actions to complete. 
-
-## Known Errors
-
-```
-Error: Client initialization failed: Failed to validate API key: 'Beta' object has no attribute 'messages'
-```
-Solution: Update the anthropic library by running:
-```
-pip install --upgrade anthropic
-```
+After completing the setup, run the application:

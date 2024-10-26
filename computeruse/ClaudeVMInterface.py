@@ -26,6 +26,7 @@ class ClaudeVMInterface:
         window_width = min(1200, self.screen_width - 100)
         window_height = min(800, self.screen_height - 100)
         self.root.geometry(f"{window_width}x{window_height}")
+        self.scale_factor = tk.DoubleVar(value=0.5)
         
         self.client = None
         self.is_processing = False
@@ -42,8 +43,10 @@ class ClaudeVMInterface:
         self.current_screenshot = None
         self.last_mouse_pos = None
         
-        self.target_width = int(self.screen_width / 1.5)
-        self.target_height = int(self.screen_height / 1.5)
+        self.downscale_var = tk.DoubleVar(value=0.5)
+
+        self.aspect_ratio = self.screen_width / self.screen_height
+        self.target_width, self.target_height = self.calculate_target_resolution()
 
         self.scale_x = float(self.target_width) / float(self.screen_width)
         self.scale_y = float(self.target_height) / float(self.screen_height)
@@ -108,6 +111,30 @@ class ClaudeVMInterface:
         )
         self.show_screenshots_check.pack(side=tk.LEFT, padx=5)
         
+        self.teleport_mouse_var = tk.BooleanVar(value=False)
+        self.teleport_mouse_check = ttk.Checkbutton(
+            options_frame,
+            text="Teleport Mouse",
+            variable=self.teleport_mouse_var
+        )
+        self.teleport_mouse_check.pack(side=tk.LEFT, padx=5)
+        
+        downscale_frame = ttk.Frame(options_frame)
+        downscale_frame.pack(side=tk.LEFT, padx=5)
+        ttk.Label(downscale_frame, text="Downscale:").pack(side=tk.LEFT)
+        self.downscale_scale = ttk.Scale(
+            downscale_frame,
+            from_=0.0,
+            to=1.0,
+            orient=tk.HORIZONTAL,
+            variable=self.downscale_var,
+            command=self.update_target_resolution
+        )
+        self.downscale_scale.pack(side=tk.LEFT)
+        self.downscale_scale.bind("<ButtonRelease-1>", self.snap_to_nearest_tenth)
+        self.downscale_label = ttk.Label(downscale_frame, text="0.5")
+        self.downscale_label.pack(side=tk.LEFT)
+        
         history_frame = ttk.LabelFrame(left_panel, text="Conversation History", padding="5")
         history_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
         
@@ -164,6 +191,10 @@ class ClaudeVMInterface:
         status_bar = ttk.Label(left_panel, textvariable=self.status_var, relief=tk.SUNKEN)
         status_bar.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
         
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(left_panel, variable=self.progress_var, maximum=self.max_iterations)
+        self.progress_bar.grid(row=6, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
+        
         left_panel.columnconfigure(0, weight=1)
         left_panel.rowconfigure(2, weight=1)
         main_frame.columnconfigure(0, weight=3)
@@ -173,6 +204,55 @@ class ClaudeVMInterface:
         self.root.rowconfigure(0, weight=1)
         
         self.add_to_history("System", "Welcome! Please initialize the client with your API key to begin.")
+
+    def calculate_target_resolution(self):
+        downscale_factor = self.downscale_var.get()
+        target_width = int(self.screen_width * downscale_factor)
+        target_height = int(self.screen_height * downscale_factor)
+        return target_width, target_height
+
+    def snap_to_nearest_tenth(self, event):
+        value = self.downscale_var.get()
+        snapped_value = round(value * 10) / 10
+        self.downscale_var.set(snapped_value)
+        self.update_target_resolution()
+
+    def update_target_resolution(self, *args):
+        downscale_value = round(self.downscale_var.get(), 1)
+        self.downscale_var.set(downscale_value)
+        self.target_width, self.target_height = self.calculate_target_resolution()
+        self.scale_x = float(self.target_width) / float(self.screen_width)
+        self.scale_y = float(self.target_height) / float(self.screen_height)
+        self.downscale_label.config(text=f"{downscale_value:.1f}")
+        self.add_to_history("System", f"Target resolution updated to {self.target_width}x{self.target_height}")
+        if self.current_screenshot:
+            self.update_screenshot_preview()
+
+    def resize_screenshot(self, screenshot):
+        original_width, original_height = screenshot.size
+        target_width, target_height = self.calculate_target_resolution()
+        
+        if (original_width, original_height) != (target_width, target_height):
+            resized_screenshot = screenshot.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        else:
+            resized_screenshot = screenshot
+        
+        return resized_screenshot
+
+    def update_screenshot_preview(self):
+        if self.current_screenshot and hasattr(self, 'show_screenshots_var') and self.show_screenshots_var.get():
+            screenshot = Image.open(BytesIO(base64.b64decode(self.current_screenshot["image_data"])))
+            
+            # 이미지 라벨의 크기 가져오기
+            label_width = self.image_label.winfo_width()
+            label_height = self.image_label.winfo_height()
+            
+            # 라벨 크기에 맞추되 비율 유지
+            screenshot.thumbnail((label_width, label_height), Image.Resampling.LANCZOS)
+            
+            photo = ImageTk.PhotoImage(screenshot)
+            self.image_label.configure(image=photo)
+            self.image_label.image = photo
 
     def stop_processing(self):
         if self.is_processing:
@@ -219,7 +299,7 @@ class ClaudeVMInterface:
             return True
         except Exception as e:
             self.client = None
-            raise Exception(f"Failed to validate API key: {str(e)}")
+        raise Exception(f"Failed to validate API key: {str(e)}")
     
     def toggle_key_visibility(self):
         self.api_entry.config(show='' if self.show_key_var.get() else '*')
@@ -502,70 +582,53 @@ class ClaudeVMInterface:
             
             if action == 'screenshot':
                 screenshot = pyautogui.screenshot()
-                max_size = (self.target_width, self.target_height)
                 
-                screenshot = screenshot.resize(max_size, Image.Resampling.LANCZOS)
+                # 화면 비율에 맞게 리사이징
+                screenshot = self.resize_screenshot(screenshot)
                 
                 if hasattr(self, 'show_screenshots_var') and self.show_screenshots_var.get():
-                    photo = ImageTk.PhotoImage(screenshot)
-                    self.image_label.configure(image=photo)
-                    self.image_label.image = photo
+                    self.update_screenshot_preview()
                 
                 buffered = BytesIO()
                 screenshot.save(buffered, format="JPEG", quality=60, optimize=True)
                 img_str = base64.b64encode(buffered.getvalue()).decode()
                 
                 size_kb = len(buffered.getvalue()) / 1024
-                self.add_to_history("Debug", f"Screenshot size: {size_kb:.2f}KB")
+                self.add_to_history("System", f"Screenshot captured (size: {size_kb:.2f}KB)")
                 
                 self.current_screenshot = {
                     "image_data": img_str,
                     "size": size_kb,
-                    "resolution": f"{max_size[0]}x{max_size[1]}"
+                    "resolution": f"{self.target_width}x{self.target_height}"
                 }
                 
-                self.add_to_history("System", "Screenshot captured and processed")
                 return {"type": "screenshot_taken"}
-        
+            
             elif action == 'mouse_move':
                 coordinates = tool_input.get('coordinate', [0, 0])
                 
-                real_x = min(int(coordinates[0] / self.scale_x), self.screen_width - 10)
-                real_y = min(int(coordinates[1] / self.scale_y), self.screen_height - 10)
-                
-                self.add_to_history("Debug", 
-                    f"Coordinate conversion:\n"
-                    f"Input coordinates: ({coordinates[0]}, {coordinates[1]})\n"
-                    f"Screen resolution: {self.screen_width}x{self.screen_height}\n"
-                    f"Scale factors: {self.scale_x:.3f}, {self.scale_y:.3f}\n"
-                    f"Last position: {self.last_mouse_pos}\n"
-                    f"Calculated real coordinates: ({real_x}, {real_y})"
-                )
+                real_x = float(coordinates[0]) / self.scale_x
+                real_y = float(coordinates[1]) / self.scale_y
                 
                 try:
                     current_x, current_y = pyautogui.position()
-                    steps = 10
-                    for i in range(steps + 1):
-                        intermediate_x = current_x + ((real_x - current_x) * i / steps)
-                        intermediate_y = current_y + ((real_y - current_y) * i / steps)
-                        pyautogui.moveTo(intermediate_x, intermediate_y, duration=0.02)
+                    if self.teleport_mouse_var.get():
+                        pyautogui.moveTo(real_x, real_y)
+                    else:
+                        pyautogui.moveTo(real_x, real_y, duration=0.5)
                     
                     self.last_mouse_pos = (real_x, real_y)
-                    self.add_to_history("System", 
-                        f"Mouse moved to ({real_x}, {real_y})\n"
-                        f"Original coordinates: ({coordinates[0]}, {coordinates[1]})"
-                    )
+                    self.add_to_history("System", f"Mouse moved to ({real_x}, {real_y})")
                     return {
                         "type": "mouse_moved",
                         "from": [current_x, current_y],
                         "to": [real_x, real_y],
-                        "original": coordinates,
-                        "relative": coordinates[0] < 100 and coordinates[1] < 100
+                        "original": coordinates
                     }
                 except Exception as mouse_error:
                     self.add_to_history("Error", f"Mouse move failed: {str(mouse_error)}")
                     return {"type": "error", "error": str(mouse_error)}
-                
+            
             elif action == 'left_click':
                 if self.last_mouse_pos:
                     try:
@@ -573,7 +636,7 @@ class ClaudeVMInterface:
                         pyautogui.click(self.last_mouse_pos[0], self.last_mouse_pos[1])
                         self.add_to_history("System", f"Clicked at {self.last_mouse_pos}")
                         
-                        time.sleep(2.0)
+                        time.sleep(3.0)
                         
                         return {
                             "type": "click",
@@ -585,7 +648,7 @@ class ClaudeVMInterface:
                 else:
                     self.add_to_history("Error", "No previous mouse position for click")
                     return {"type": "error", "message": "No mouse position"}
-                
+            
             elif action == 'type':
                 text = tool_input.get('text', '')
                 pyautogui.write(text, interval=0.1)
@@ -594,7 +657,7 @@ class ClaudeVMInterface:
                     "type": "type",
                     "text": text
                 }
-                
+            
             elif action == 'key':
                 key = tool_input.get('text', '')
                 pyautogui.press(key)
@@ -606,7 +669,7 @@ class ClaudeVMInterface:
                 }
             
             return {"status": "unknown_action"}
-                
+        
         except Exception as e:
             self.add_to_history("Error", f"Tool execution error: {str(e)}")
             return {"error": str(e)}
@@ -641,7 +704,7 @@ class ClaudeVMInterface:
                 "role": "user",
                 "content": [{
                     "type": "text",
-                    "text": f"We are using a VM environment with screen resolution {self.screen_width}x{self.screen_height}. Mouse coordinates have been scaled appropriately."
+                    "text": f"We are using a VM environment with screen resolution {self.screen_width}x{self.screen_height}. The screenshot has been resized to {self.target_width}x{self.target_height} for processing. Mouse coordinates have been scaled appropriately."
                 }]
             }, next_message]
 
@@ -653,8 +716,8 @@ class ClaudeVMInterface:
                 tools=[{
                     "type": "computer_20241022",
                     "name": "computer",
-                    "display_width_px": self.screen_width,
-                    "display_height_px": self.screen_height,
+                    "display_width_px": self.target_width,
+                    "display_height_px": self.target_height,
                     "display_number": 1
                 }],
                 betas=["computer-use-2024-10-22"]
