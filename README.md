@@ -33,25 +33,50 @@ Participation is welcomed. Currently facing many issues with calibration of the 
      ```
      ANTHROPIC_API_KEY=your_api_key_here
      ```
-   - Alternatively, you can set it as an environment variable in your virtual machine for ease of use:
-     ```
-     export ANTHROPIC_API_KEY=your_api_key_here
-     ```
 
-### Alternative: Local Machine (Not Recommended)
-
-If you choose to run on your local machine despite the risks:
-
-1. Follow steps 2-4 from the virtual machine setup.
-
-2. It's strongly advised to use a virtual environment:
+5. Run the application:
    ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows use: venv\Scripts\activate
+   python main.py
    ```
 
-Note: Ensure you have Python 3.7 or higher installed on your system.
+Note: Make sure you have Python 3.7 or higher installed on your system.
 
-## Running the Application
+## Usage
 
-After completing the setup, run the application:
+### Step 1. Initialize with API Key
+
+Insert your Claude API Key in the main window, and press Initialize.
+
+![Before_initialize](./img/CCMP1.png)
+![After_initialize](./img/CCMP1-1.png)
+
+### Step 2. Submit Your Prompt
+
+Write your prompt in the input box and press Submit.
+
+![Processing](./img/CCMP2.png)
+
+### Optional
+
+- Show Screenshots in Conversation : This will show halved resolution screenshots from the image sent to the Claude. Displays on the right.
+
+- Teleport Mouse : For mouse movement, if checked, this will teleport the mouse. Otherwise it will gradually move.
+
+- Downscale : Downscale factor for the screenshots. __(Practically, 0.5 is believed to perform best.)__
+
+## Current Status
+
+- Errors in correctly locating the cursor. This may be due to image downscaling (due to token length limit)
+- Errors in identifying whether the goal has been achieved.
+- Currently taking two screenshots at the beginning of the task. 
+- Need calibration of the awaiting time for the actions to complete. 
+
+## Known Errors
+
+```
+Error: Client initialization failed: Failed to validate API key: 'Beta' object has no attribute 'messages'
+```
+Solution: Update the anthropic library by running:
+```
+pip install --upgrade anthropic
+```
