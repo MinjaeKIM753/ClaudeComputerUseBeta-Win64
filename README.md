@@ -36,14 +36,7 @@ Participation is welcomed. Currently facing many issues with calibration of the 
    pip install -r requirements.txt
    ```
 
-5. Set up your Anthropic API key:
-   - Create a `.env` file in the project root directory
-   - Add your API key to the file:
-     ```
-     ANTHROPIC_API_KEY=your_api_key_here
-     ```
-
-6. Run the application:
+5. Run the application:
    ```
    python main.py
    ```
