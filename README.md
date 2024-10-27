@@ -71,12 +71,21 @@ Write your prompt in the input box and press Submit.
 - Currently taking two screenshots at the beginning of the task. 
 - Need calibration of the awaiting time for the actions to complete. 
 
+## Upcoming Features
+
+- Add actions (double clicking, scrolling, waiting, right clicking, dragging, special keys(changing typing language))
+- Improve GUI
+- Improve memory lag (Currently, it reflects the previous task and the first task. This is to prevent hallucinations and repetitions.)
+
 ## Known Errors
 
 ```
 Error: Client initialization failed: Failed to validate API key: 'Beta' object has no attribute 'messages'
 ```
-Solution: Update the anthropic library by running:
+Solution: pip install --upgrade anthropic
+
+
 ```
-pip install --upgrade anthropic
+Error: Client initialization failed: cannot access local variable 'e' where it is not associated with a value
 ```
+Solution: Check API Budget (and VPN Connection if your location does not allow Anthropic API)
