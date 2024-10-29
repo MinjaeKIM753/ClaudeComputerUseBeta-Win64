@@ -1,3 +1,4 @@
-from .ClaudeVMInterface import ClaudeVMInterface
+# computeruse/__init__.py
+from .gui.main_window import ComputerInterface
 
-__all__ = ["ClaudeVMInterface"]
+__all__ = ["ComputerInterface"]
