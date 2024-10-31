@@ -15,7 +15,7 @@ class ConfigDefaults:
 class Config:
     def __init__(self):
         self.settings = {
-            'downscale_factor': 0.5,
+            'downscale_factor': 1.0,  # Default to native resolution
             'min_action_delay': 0.5,
             'max_iterations': 20,
             'wait_time': 3.0,
@@ -25,11 +25,17 @@ class Config:
         }
     
     def get_setting(self, key: str, default: Any = None) -> Any:
-        """Get a setting with an optional default value"""
         return self.settings.get(key, default)
     
     def update_setting(self, key: str, value: Any) -> None:
-        """Update a setting"""
+        """Update setting and validate specific values"""
+        if key == 'downscale_factor':
+            # Ensure downscale is exactly what we set
+            value = float(value)
+            if value > 1.0:
+                value = 1.0
+            elif value < 0.1:
+                value = 0.1
         self.settings[key] = value
     
     def get_api_key(self) -> str:

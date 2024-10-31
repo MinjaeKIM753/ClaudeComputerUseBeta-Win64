@@ -17,9 +17,17 @@ class ActionHandler:
         self.last_action_time = time.time()
         self.current_screenshot = None
         
+        # Store native resolution
+        self.native_width, self.native_height = pyautogui.size()
+        
+        # Validate initial scale factor
+        downscale = self.config.get_setting('downscale_factor', 1.0)
+        self.config.update_setting('downscale_factor', downscale)
+
     def execute_action(self, action: str, tool_input: dict) -> dict:
         """Execute the specified action with given parameters"""
         try:
+            print("ACTION : ", action)
             # Log incoming action request
             self.logger.add_entry("Debug", f"Action request - Action: {action}, Input: {json.dumps(tool_input)}")
             
@@ -67,24 +75,34 @@ class ActionHandler:
             return {"type": "error", "error": error_msg}
 
     def _handle_screenshot(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle taking and processing screenshots"""
         try:
-            # Take the screenshot
+            # Force scale check
+            downscale = self.config.get_setting('downscale_factor', 1.0)
+            
+            # Calculate target resolution
+            target_width = int(self.native_width * downscale)
+            target_height = int(self.native_height * downscale)
+            
+            self.logger.add_entry("Debug", 
+                f"Taking screenshot with scale {downscale} "
+                f"({self.native_width}x{self.native_height} -> {target_width}x{target_height})")
+
+            # Take native resolution screenshot
             screenshot = pyautogui.screenshot()
+            current_width, current_height = screenshot.size
             
-            # Get target resolution
-            downscale = self.config.get_setting('downscale_factor')
-            target_width = int(pyautogui.size()[0] * downscale)
-            target_height = int(pyautogui.size()[1] * downscale)
+            self.logger.add_entry("Debug", 
+                f"Original screenshot size: {current_width}x{current_height}")
             
-            # Resize if needed
+            # Resize only if necessary
             if downscale != 1.0:
                 screenshot = screenshot.resize(
-                    (target_width, target_height), 
+                    (target_width, target_height),
                     Image.Resampling.LANCZOS
                 )
-            
-            # Convert to bytes
+                self.logger.add_entry("Debug", f"Resized to: {target_width}x{target_height}")
+
+            # Save with quality settings
             buffered = BytesIO()
             screenshot.save(
                 buffered,
@@ -93,34 +111,47 @@ class ActionHandler:
                 optimize=True
             )
             
-            # Encode to base64
             img_str = base64.b64encode(buffered.getvalue()).decode()
-            
-            # Calculate size
             size_kb = len(buffered.getvalue()) / 1024
             
-            # Store current screenshot
+            final_width, final_height = screenshot.size
             self.current_screenshot = {
                 "image_data": img_str,
                 "size": size_kb,
-                "resolution": f"{target_width}x{target_height}",
-                "timestamp": time.time()
+                "resolution": f"{final_width}x{final_height}",
+                "timestamp": time.time(),
+                "scale_factor": downscale
+            }
+            
+            result = {
+                "type": "screenshot_taken",
+                "size_kb": size_kb,
+                "resolution": f"{final_width}x{final_height}",
+                "scale_factor": downscale
             }
             
             self.logger.add_entry(
                 "System",
-                f"Screenshot captured (size: {size_kb:.2f}KB, resolution: {target_width}x{target_height})"
+                f"Screenshot captured (size: {size_kb:.2f}KB, "
+                f"resolution: {final_width}x{final_height}, "
+                f"scale: {downscale})"
             )
             
-            return {
-                "type": "screenshot_taken",
-                "size_kb": size_kb,
-                "resolution": f"{target_width}x{target_height}"
-            }
+            return result
             
         except Exception as e:
             self.logger.add_entry("Error", f"Screenshot failed: {str(e)}")
             return {"type": "error", "error": str(e)}
+
+    def get_target_resolution(self) -> Tuple[int, int]:
+        """Get target resolution based on downscale factor"""
+        downscale = self.config.get_setting('downscale_factor')
+        if downscale == 1.0:  # Use native resolution
+            return self.native_width, self.native_height
+        return (
+            int(self.native_width * downscale), 
+            int(self.native_height * downscale)
+        )
 
     def get_current_screenshot(self) -> Optional[Dict[str, Any]]:
         """Get the most recent screenshot data"""
