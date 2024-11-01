@@ -2,7 +2,7 @@
 
 Beta trial code for the **Claude 3.5 Sonnet Computer Use (Beta) on __Win64__**.
 
- ⚠️ !Warning: Please use this script with caution.
+ ⚠️ **Warning**: Please use this script with caution.
 
 As noted in the [Anthropic Computer Use (Beta) Documentation](https://docs.anthropic.com/en/docs/build-with-claude/computer-use), it is recommended that the Computer Use to be ran on Virtual Machines. 
 
@@ -68,13 +68,15 @@ Write your prompt in the input box and press Submit.
 ## Current Status
 
 - Coordinate accuracy falls for higher resolutions (Approx 1280X720 is tested good).
+
 - Attempts to reduce the number of tokens taken to complete the goal.
-- 
 
 ## Upcoming Features
 
 - Improve GUI
+
 - Prompt format Claude responses for better accuracy
+
 - Load API key by environment varaible
 
 ## Updated Features
