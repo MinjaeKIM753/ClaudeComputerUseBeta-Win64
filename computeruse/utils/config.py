@@ -14,8 +14,9 @@ class ConfigDefaults:
 
 class Config:
     def __init__(self):
+        # Initialize with 0.5 scale by default
         self.settings = {
-            'downscale_factor': 1.0,  # Default to native resolution
+            'downscale_factor': 0.5,  # Start with 0.5 scale
             'min_action_delay': 0.5,
             'max_iterations': 20,
             'wait_time': 3.0,
@@ -25,18 +26,21 @@ class Config:
         }
     
     def get_setting(self, key: str, default: Any = None) -> Any:
-        return self.settings.get(key, default)
+        """Get setting with proper type conversion for scale factor"""
+        value = self.settings.get(key, default)
+        if key == 'downscale_factor':
+            return float(value)  # Ensure scale is always float
+        return value
     
     def update_setting(self, key: str, value: Any) -> None:
-        """Update setting and validate specific values"""
+        """Update setting with validation"""
         if key == 'downscale_factor':
-            # Ensure downscale is exactly what we set
-            value = float(value)
+            value = float(value)  # Convert to float
             if value > 1.0:
                 value = 1.0
             elif value < 0.1:
                 value = 0.1
-        self.settings[key] = value
+            self.settings[key] = value
     
     def get_api_key(self) -> str:
         """Get the API key from environment"""

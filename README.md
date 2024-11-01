@@ -2,13 +2,15 @@
 
 Beta trial code for the **Claude 3.5 Sonnet Computer Use (Beta) on __Win64__**.
 
-⚠️ **WARNING**: It is HIGHLY RECOMMENDED to run this application in a virtual machine environment for security and isolation purposes. Running this on your local machine directly carries potential security risks.
+ ⚠️ [!Warning]: Please use this script with caution.
 
-As noted in the [Anthropic Computer Use (Beta) Documentation](https://docs.anthropic.com/en/docs/build-with-claude/computer-use), it is recommended that the Computer Use be run in Virtual Machines. 
+As noted in the [Anthropic Computer Use (Beta) Documentation](https://docs.anthropic.com/en/docs/build-with-claude/computer-use), it is recommended that the Computer Use to be ran on Virtual Machines. 
 
 For Docker based Computer Use (Beta), please visit [Anthropic Computer Use (Beta)](https://github.com/anthropics/anthropic-quickstarts/tree/main/computer-use-demo).
 
-Participation is welcomed. Currently facing many issues with calibration of the awaiting time for the actions to complete and the accuracy of the goal recognition. 
+For Macos Demo Computer Use, please visit [PallavAg's Repo](https://github.com/PallavAg/claude-computer-use-macos/tree/main).
+
+Any participation is welcome, please let me know if there are issues or advices. 
 
 ## Installation and Setup
 
@@ -49,7 +51,7 @@ Write your prompt in the input box and press Submit.
 
 ![Processing](./img/CCMP2.png)
 
-### Optional
+### Options
 
 - Show Screenshots in Conversation : This will show halved resolution screenshots from the image sent to the Claude. Displays on the right.
 
@@ -57,18 +59,28 @@ Write your prompt in the input box and press Submit.
 
 - Downscale : Downscale factor for the screenshots. __(Practically, 0.5 is believed to perform best.)__
 
+- Action Delay : Time for delay in between each actions. __(Practically, 3.0 seconds is good enough)__
+
+- Coordinate Debug : For reference.
+
+- Quick Tasks : List of available prompts for testing. 
+
 ## Current Status
 
-- Errors in correctly locating the cursor. This may be due to image downscaling (due to token length limit)
-- Errors in identifying whether the goal has been achieved.
-- Currently taking two screenshots at the beginning of the task. 
-- Need calibration of the awaiting time for the actions to complete. 
+- Coordinate accuracy falls for higher resolutions (Approx 1280X720 is tested good).
+- Attempts to reduce the number of tokens taken to complete the goal.
+- 
 
 ## Upcoming Features
 
-- Add actions (double clicking, scrolling, waiting, right clicking, dragging, special keys(changing typing language))
 - Improve GUI
-- Improve memory lag (Currently, it reflects the previous task and the first task. This is to prevent hallucinations and repetitions.)
+- Prompt format Claude responses for better accuracy
+- Load API key by environment varaible
+
+## Updated Features
+
+- ~~Add actions (double clicking, scrolling, waiting, right clicking, dragging, special keys(changing typing language))~~ (Nov 1st)
+- ~~Improve memory lag (Currently, it reflects the previous task and the first task. This is to prevent hallucinations and repetitions.)~~ (Nov 1st)
 
 ## Known Errors
 

@@ -128,28 +128,47 @@ class OptionsFrame(ttk.LabelFrame):
         self.wait_time_label = ttk.Label(timing_frame, text="3.0s")
         self.wait_time_label.pack(side=tk.LEFT, padx=5)
     
-    def on_scale_changed(self, *args) -> None:
+    def on_scale_changed(self, *args):
         """Handle scale change events"""
         value = round(self.downscale_var.get(), 1)
         self.downscale_var.set(value)
         self.downscale_label.config(text=f"{value:.1f}")
         
-        # Update target resolution display
-        target_width = int(self.controller.interface.native_width * value)
-        target_height = int(self.controller.interface.native_height * value)
-        self.target_res_label.config(text=f"Target: {target_width}x{target_height}")
+        # Update config
+        self.controller.config.update_setting('downscale_factor', value)
         
-        # Update interface
+        # Force update the interface resolution
         self.controller.interface.update_target_resolution(value)
+        
+        # Update the action handler scale
+        self.controller.interface.action_handler.update_resolution_settings()
         
         # Update preview if available
         self.controller.update_screenshot_preview()
+        
+        # Log the scale change
+        self.controller.logger.add_entry("Debug", 
+            f"Scale changed to {value:.1f} - "
+            f"Target resolution: {int(self.controller.interface.native_width * value)}x"
+            f"{int(self.controller.interface.native_height * value)}"
+        )
     
     def snap_to_nearest_tenth(self, event: Optional[tk.Event]) -> None:
-        """Snap scale value to nearest tenth"""
+        """Snap scale value to nearest tenth and update all components"""
         value = round(self.downscale_var.get() * 10) / 10
         self.downscale_var.set(value)
-        self.on_scale_changed()
+        self.downscale_label.config(text=f"{value:.1f}")
+        
+        # Update all components
+        self.controller.update_global_scale(value)
+    
+    def update_all_scale_display(self, value: float) -> None:
+        """Update GUI elements showing scale"""
+        self.downscale_label.config(text=f"{value:.1f}")
+        if hasattr(self, 'target_res_label'):
+            target_width = int(self.controller.interface.native_width * value)
+            target_height = int(self.controller.interface.native_height * value)
+            self.target_res_label.config(text=f"Target: {target_width}x{target_height}")
 
 class CoordinateDebugFrame(ttk.LabelFrame):
     def __init__(self, parent: Any, controller: Any):
@@ -544,10 +563,6 @@ class StatusBar(ttk.Frame):
     def update_mouse_position(self, x: int, y: int) -> None:
         """Update mouse position display"""
         self.mouse_pos_label.config(text=f"Mouse: ({x}, {y})")
-    
-    def update_scale(self, scale: float) -> None:
-        """Update scale factor display"""
-        self.scale_label.config(text=f"Scale: {scale:.1f}")
     
     def update_resolution(self, width: int, height: int) -> None:
         """Update resolution display"""

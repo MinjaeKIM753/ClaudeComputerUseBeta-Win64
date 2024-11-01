@@ -1,8 +1,7 @@
 # computeruse/core/action_handler.py
 import pyautogui
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Optional
 import time
-import json
 from PIL import Image
 from io import BytesIO
 import base64
@@ -11,31 +10,52 @@ class ActionHandler:
     def __init__(self, config, logger):
         self.config = config
         self.logger = logger
-        self.last_mouse_pos: Optional[Tuple[float, float]] = None
-        self.is_dragging = False
-        self.drag_start_pos: Optional[Tuple[float, float]] = None
-        self.last_action_time = time.time()
-        self.current_screenshot = None
         
-        # Store native resolution
+        # Get current scale from config
+        self.current_scale = float(config.get_setting('downscale_factor'))
+        
+        # Store initial screen properties
         self.native_width, self.native_height = pyautogui.size()
+        self.target_width = int(self.native_width * self.current_scale)
+        self.target_height = int(self.native_height * self.current_scale)
         
-        # Validate initial scale factor
-        downscale = self.config.get_setting('downscale_factor', 1.0)
-        self.config.update_setting('downscale_factor', downscale)
+        # Log initial state
+        self.logger.add_entry("Debug",
+            f"ActionHandler initialized with scale: {self.current_scale:.1f}\n"
+            f"Target resolution: {self.target_width}x{self.target_height}"
+        )
+        
+        # Mouse state
+        self.last_mouse_pos = None
+        self.is_dragging = False
+        
+        # Action timing
+        self.last_action_time = time.time()
+        self.min_action_delay = config.get_setting('min_action_delay', 0.5)
+
+    def update_resolution_settings(self) -> None:
+        """Update internal resolution settings from config"""
+        downscale = float(self.config.get_setting('downscale_factor', 1.0))
+        native_width, native_height = pyautogui.size()
+        
+        self.target_width = int(native_width * downscale)
+        self.target_height = int(native_height * downscale)
+        
+        self.logger.add_entry("Debug",
+            f"Resolution settings updated:\n"
+            f"Downscale factor: {downscale}\n"
+            f"Native resolution: {native_width}x{native_height}\n"
+            f"Target resolution: {self.target_width}x{self.target_height}\n"
+            f"Scale factors: ({1.0/downscale:.2f}, {1.0/downscale:.2f})"
+        )
 
     def execute_action(self, action: str, tool_input: dict) -> dict:
         """Execute the specified action with given parameters"""
         try:
-            print("ACTION : ", action)
-            # Log incoming action request
-            self.logger.add_entry("Debug", f"Action request - Action: {action}, Input: {json.dumps(tool_input)}")
-            
             # Ensure minimum delay between actions
             elapsed = time.time() - self.last_action_time
-            min_delay = self.config.get_setting('min_action_delay')
-            if elapsed < min_delay:
-                time.sleep(min_delay - elapsed)
+            if elapsed < self.min_action_delay:
+                time.sleep(self.min_action_delay - elapsed)
 
             # Map of available actions
             action_map = {
@@ -53,22 +73,17 @@ class ActionHandler:
 
             # Validate action
             if action not in action_map:
-                error_msg = f"Unknown action: {action}. Available actions: {', '.join(action_map.keys())}"
+                error_msg = f"Unknown action: {action}"
                 self.logger.add_entry("Error", error_msg)
                 return {"type": "error", "error": error_msg}
 
-            # Execute action
-            handler = action_map[action]
-            result = handler(tool_input)
+            # Execute action (only once)
+            result = action_map[action](tool_input)
             
             # Update last action time
             self.last_action_time = time.time()
-            
-            # Log result
-            self.logger.add_entry("Debug", f"Action result: {json.dumps(result)}")
-            
             return result
-        
+            
         except Exception as e:
             error_msg = f"Action execution error: {str(e)}"
             self.logger.add_entry("Error", error_msg)
@@ -76,32 +91,23 @@ class ActionHandler:
 
     def _handle_screenshot(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            # Force scale check
-            downscale = self.config.get_setting('downscale_factor', 1.0)
+            # Get current scale
+            self.current_scale = float(self.config.get_setting('downscale_factor'))
             
-            # Calculate target resolution
-            target_width = int(self.native_width * downscale)
-            target_height = int(self.native_height * downscale)
-            
-            self.logger.add_entry("Debug", 
-                f"Taking screenshot with scale {downscale} "
-                f"({self.native_width}x{self.native_height} -> {target_width}x{target_height})")
-
-            # Take native resolution screenshot
+            # Take screenshot at native resolution
             screenshot = pyautogui.screenshot()
-            current_width, current_height = screenshot.size
+            original_width, original_height = screenshot.size
             
-            self.logger.add_entry("Debug", 
-                f"Original screenshot size: {current_width}x{current_height}")
-            
-            # Resize only if necessary
-            if downscale != 1.0:
-                screenshot = screenshot.resize(
-                    (target_width, target_height),
-                    Image.Resampling.LANCZOS
-                )
-                self.logger.add_entry("Debug", f"Resized to: {target_width}x{target_height}")
+            # ALWAYS resize for Claude according to scale
+            # (e.g., 2560x1440 -> 1280x720 when scale is 0.5)
+            target_width = int(original_width * self.current_scale)
+            target_height = int(original_height * self.current_scale)
 
+            screenshot = screenshot.resize(
+                (target_width, target_height),
+                Image.Resampling.LANCZOS
+            )
+            
             # Save with quality settings
             buffered = BytesIO()
             screenshot.save(
@@ -114,97 +120,81 @@ class ActionHandler:
             img_str = base64.b64encode(buffered.getvalue()).decode()
             size_kb = len(buffered.getvalue()) / 1024
             
-            final_width, final_height = screenshot.size
             self.current_screenshot = {
                 "image_data": img_str,
                 "size": size_kb,
-                "resolution": f"{final_width}x{final_height}",
-                "timestamp": time.time(),
-                "scale_factor": downscale
+                "resolution": f"{target_width}x{target_height}",
+                "scale_factor": self.current_scale,
+                "timestamp": time.time()
             }
             
-            result = {
-                "type": "screenshot_taken",
-                "size_kb": size_kb,
-                "resolution": f"{final_width}x{final_height}",
-                "scale_factor": downscale
-            }
-            
-            self.logger.add_entry(
-                "System",
-                f"Screenshot captured (size: {size_kb:.2f}KB, "
-                f"resolution: {final_width}x{final_height}, "
-                f"scale: {downscale})"
+            self.logger.add_entry("System", 
+                f"Screenshot for Claude: {target_width}x{target_height} "
+                f"[scale: {self.current_scale:.1f}, size: {size_kb:.1f}KB]"
             )
             
-            return result
+            return {
+                "type": "screenshot_taken",
+                "resolution": f"{target_width}x{target_height}",
+                "scale_factor": self.current_scale
+            }
             
         except Exception as e:
             self.logger.add_entry("Error", f"Screenshot failed: {str(e)}")
             return {"type": "error", "error": str(e)}
 
-    def get_target_resolution(self) -> Tuple[int, int]:
-        """Get target resolution based on downscale factor"""
-        downscale = self.config.get_setting('downscale_factor')
-        if downscale == 1.0:  # Use native resolution
-            return self.native_width, self.native_height
-        return (
-            int(self.native_width * downscale), 
-            int(self.native_height * downscale)
-        )
-
-    def get_current_screenshot(self) -> Optional[Dict[str, Any]]:
-        """Get the most recent screenshot data"""
-        return self.current_screenshot
-
     def _handle_mouse_move(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         try:
             coordinates = tool_input.get('coordinate', [0, 0])
             current_x, current_y = pyautogui.position()
+            # Get scale from config
+            scale = float(self.config.get_setting('downscale_factor'))
             
-            # Get scale factors
-            downscale = self.config.get_setting('downscale_factor')
-            if downscale == 1.0:
-                real_x = float(coordinates[0])
-                real_y = float(coordinates[1])
-            else:
-                # Transform coordinates based on scale
-                scale_x = pyautogui.size()[0] / (pyautogui.size()[0] * downscale)
-                scale_y = pyautogui.size()[1] / (pyautogui.size()[1] * downscale)
-                real_x = float(coordinates[0]) * scale_x
-                real_y = float(coordinates[1]) * scale_y
+            # Calculate scaled coordinates based on scale factor
+            # Claude always provides coordinates for scaled resolution
+            target_x = float(coordinates[0]) * (1.0 / scale)  # Scale up
+            target_y = float(coordinates[1]) * (1.0 / scale)  # Scale up
+            
+            # Validate bounds
+            target_x = max(0, min(target_x, self.native_width - 1))
+            target_y = max(0, min(target_y, self.native_height - 1))
             
             self.logger.add_entry("Debug", 
-                f"Coordinate transformation: ({coordinates[0]}, {coordinates[1]}) -> "
-                f"({real_x:.2f}, {real_y:.2f}), Scale: {downscale}")
+                f"Mouse move: Claude({coordinates[0]}, {coordinates[1]}) -> "
+                f"Native({target_x:.0f}, {target_y:.0f}) "
+                f"[scale: {scale:.1f}, upscale: {1.0/scale:.1f}x]"
+            )
             
-            duration = 0 if self.config.get_setting('teleport_mouse') else 0.5
-            pyautogui.moveTo(real_x, real_y, duration=duration)
-            
-            self.last_mouse_pos = (real_x, real_y)
+            # Move mouse
+            duration = 0 if self.config.get_setting('teleport_mouse', False) else 0.5
+            pyautogui.moveTo(target_x, target_y, duration=duration)
+            self.last_mouse_pos = (target_x, target_y)
             
             return {
                 "type": "mouse_moved",
                 "from": [current_x, current_y],
-                "to": [real_x, real_y],
-                "original": coordinates,
-                "scale_factor": downscale
+                "to": [target_x, target_y],
+                "claude_coords": coordinates,
+                "scale": scale,
+                "upscale": 1.0/scale
             }
+            
         except Exception as e:
             self.logger.add_entry("Error", f"Mouse move failed: {str(e)}")
             return {"type": "error", "error": str(e)}
 
     def _handle_left_click(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            if not self.last_mouse_pos:
-                return {"type": "error", "message": "No previous mouse position"}
+            # Get current mouse position
+            current_x, current_y = pyautogui.position()
             
-            pyautogui.click(self.last_mouse_pos[0], self.last_mouse_pos[1])
-            self.logger.add_entry("System", f"Clicked at {self.last_mouse_pos}")
+            # Click at current position
+            pyautogui.click(current_x, current_y)
+            self.logger.add_entry("System", f"Clicked at ({current_x}, {current_y})")
             
             return {
                 "type": "click",
-                "position": self.last_mouse_pos
+                "position": [current_x, current_y]
             }
         except Exception as e:
             self.logger.add_entry("Error", f"Click failed: {str(e)}")
