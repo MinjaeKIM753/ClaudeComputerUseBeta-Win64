@@ -28,6 +28,15 @@ class ComputerInterface:
         self.logger = Logger()
         self.interface = Interface(self.config, self.logger)
         
+
+        # Check for API key using the Config class
+        api_key = self.config.get_api_key()
+        if api_key:
+            self.logger.add_entry("System", "API key found in environment.")
+            self.api_frame.api_key_var.set(api_key) 
+        else:
+            self.logger.add_entry("Warning", "API key NOT found in environment.")
+
         # Create style
         self.style = create_style()
         

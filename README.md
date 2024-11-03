@@ -10,7 +10,8 @@ For Docker based Computer Use (Beta), please visit [Anthropic Computer Use (Beta
 
 For Macos Demo Computer Use, please visit [PallavAg's Repo](https://github.com/PallavAg/claude-computer-use-macos/tree/main).
 
-Any participation is welcome, please let me know if there are issues or advices. 
+**This repo is made to run on Windows but are large part compatible for other major operating systems.** Any participation is welcome, please let me know if there are issues or advices. 
+
 
 ## Installation and Setup
 
@@ -28,6 +29,21 @@ Any participation is welcome, please let me know if there are issues or advices.
    ```
    pip install -r requirements.txt
    ```
+
+O. (Optional) Set API key as an environment variable:
+   - You can set the API key as an environment variable using one of the following methods:
+     - **Windows Command Prompt** 
+     Run the command `setx ANTHROPIC_API_KEY your_api_key` (replace `your_api_key` with your actual API key).
+     - **Windows PowerShell** 
+     Run the command `[Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", "your_api_key", "Machine")` (replace `your_api_key` with your actual API key).
+     - **Environment Variable Settings** 
+     You can also set the API key as an environment variable through your system's environment variable settings.
+     - **macOS (using Terminal)**
+     Run the command `export ANTHROPIC_API_KEY=your_api_key` (replace `your_api_key` with your actual API key).
+     - **Linux (using Terminal)**
+     Run the command `export ANTHROPIC_API_KEY=your_api_key` (replace `your_api_key` with your actual API key).
+     - **Other Operating Systems**
+     Please refer to your operating system's documentation for setting environment variables.
 
 4. Run the application:
    ```
@@ -75,12 +91,12 @@ Write your prompt in the input box and press Submit.
 
 - Improve GUI
 - Prompt format Claude responses for better accuracy
-- Load API key by environment varaible
 
 ## Updated Features
 
 - ~~Add actions (double clicking, scrolling, waiting, right clicking, dragging, special keys(changing typing language))~~ (Nov 1st)
 - ~~Improve memory lag (Currently, it reflects the previous task and the first task. This is to prevent hallucinations and repetitions.)~~ (Nov 1st)
+- ~~Load API key by environment varaible~~ (Nov 3rd)
 
 ## Known Errors
 

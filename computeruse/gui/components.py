@@ -6,6 +6,7 @@ from PIL import Image, ImageTk
 import base64
 from io import BytesIO
 
+
 class APIFrame(ttk.LabelFrame):
     def __init__(self, parent: Any, controller: Any):
         super().__init__(parent, text="API Configuration", padding="5")
