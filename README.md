@@ -30,19 +30,26 @@ For Macos Demo Computer Use, please visit [PallavAg's Repo](https://github.com/P
    pip install -r requirements.txt
    ```
 
-O. (Optional) Set API key as an environment variable:
+4. (Optional) Set API key as an environment variable:
    - You can set the API key as an environment variable using one of the following methods:
      - **Windows Command Prompt** 
-     Run the command `setx ANTHROPIC_API_KEY your_api_key` (replace `your_api_key` with your actual API key).
+     ```
+     setx ANTHROPIC_API_KEY your_api_key
+     ```
      - **Windows PowerShell** 
-     Run the command `[Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", "your_api_key", "Machine")` (replace `your_api_key` with your actual API key).
-     - **Environment Variable Settings** 
-     You can also set the API key as an environment variable through your system's environment variable settings.
+     ```
+     [Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", "your_api_key", "Machine")
+     ```
      - **macOS (using Terminal)**
-     Run the command `export ANTHROPIC_API_KEY=your_api_key` (replace `your_api_key` with your actual API key).
+     ```
+     export ANTHROPIC_API_KEY=your_api_key
+     ```
      - **Linux (using Terminal)**
-     Run the command `export ANTHROPIC_API_KEY=your_api_key` (replace `your_api_key` with your actual API key).
+     ```
+     export ANTHROPIC_API_KEY=your_api_key
+     ```
      - **Other Operating Systems**
+     
      Please refer to your operating system's documentation for setting environment variables.
 
 4. Run the application:

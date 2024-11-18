@@ -43,17 +43,22 @@ class Interface:
 
     def create_system_prompt(self) -> str: # FOR FUTURE USE
         """Create a system prompt to structure Claude's responses"""
-        return """Please provide responses in the following format only:
-1. No unnecessary explanations or words
-2. List actions in order using numbers:
+        return """With given current windows screenshot, Please provide responses in the following format only:
+1. No unnecessary explanations or words other than the actions and parameters below.
+2. List actions needed in order using numbers on this current stage of windows screenshot:
    1. Action description
    2. Next action
-3. Specify exact action type in [brackets] at start of each line:
-   [MOVE] coordinates for mouse movement
-   [CLICK] for clicking
-   [TYPE] for typing text
-   [KEY] for keyboard shortcuts
-   [DRAG] for drag operations"""
+3. Specify exact action type in [brackets] at start of each line, '< >' indicates the parameter required.:
+   [move]<X-Coord,Y-Coord> : coordinates for mouse movement
+   [click] : for single left-clicking at current coordinate.
+   [double_click] : for double left-clicking at current coordinate.
+   [right_click] : for right-clicking at current coordinate.
+   [mouse_scroll]<amount> : for mouse scrolling at current coordinate, specify with unit amount of scroll. 
+   [screenshot] : for taking screenshot of the current window.
+   [type]"<text>" : for typing text.
+   [key_press]<key> :  for keyboard shortcuts and special keys.
+   [drag]<X-Coord,Y-Coord> : for drag operations, specify with destination coordinate
+   [wait]<time> : for stopping operation, specify with number of seconds to wait."""
 
     def get_wait_time(self) -> float:
         """Get the current wait time between actions"""
@@ -84,7 +89,7 @@ class Interface:
             return False
             
         try:
-            test_response = self.client.beta.messages.create(
+            self.client.beta.messages.create(
                 model="claude-3-5-sonnet-20241022",
                 max_tokens=10,
                 messages=[{
@@ -286,25 +291,65 @@ class Interface:
                         "role": "assistant",
                         "content": [{"type": "text", "text": content.text}]
                     })
-                    self.logger.add_entry("Claude", content.text)
+                    #self.logger.add_entry("Claude", content.text)
 
-                    # Look for action indicators in text
-                    if "click" in text or "select" in text:
-                        current_action_context = {
-                            'type': 'click',
-                            'double': 'double' in text or 'twice' in text,
-                            'right': 'right' in text or 'context' in text
+                    
+                    # Identifying the Tasks in order
+                    line_number = 1
+                    for line in text.split('\n'):
+                        if str(line_number) + '.' in line:
+                            line = line.replace(str(line_number) + '.', '').strip()
+                        else:
+                            continue; # Wrong Format (Does not start with Number. ~)
+                        
+                        if '[screenshot]' in line:
+                            pending_actions.append(('screenshot', {}))
+                        elif '[move]' in line:
+                            coordinates = line.replace('[move]', '').strip().replace('<', '').replace('>', '')
+                            x, y = map(float, coordinates.split(','))
+                            pending_actions.append(('mouse_move', {'coordinate': [x, y]}))
+                        elif '[click]' in line:
+                            pending_actions.append(('left_click', {}))
+                        elif '[double_click]' in line:
+                            pending_actions.append(('double_click', {}))
+                        elif '[right_click]' in line:
+                            pending_actions.append(('right_click', {}))
+                        elif '[mouse_scroll]' in line:
+                            scroll_amount = line.replace('[mouse_scroll]', '').strip().replace('<', '').replace('>', '')
+                            pending_actions.append(('mouse_scroll', {'amount': scroll_amount}))
+                        elif '[type]' in line:
+                            text_to_type = line.replace('[type]', '').strip().replace('"', '')
+                            pending_actions.append(('type', {'text': text_to_type}))
+                        elif '[key_press]' in line:
+                            key_to_press = line.replace('[key_press]', '').strip().replace('<', '').replace('>', '')
+                            pending_actions.append(('key_press', {'key': key_to_press}))
+                        elif '[drag]' in line:
+                            drag_coordinates = line.replace('[drag]', '').strip().replace('<', '').replace('>', '')
+                            x, y = map(float, drag_coordinates.split(','))
+                            pending_actions.append(('drag', {'coordinate': [x, y]}))
+                        elif '[wait]' in line:
+                            wait_time = line.replace('[wait]', '').strip().replace('<', '').replace('>', '')
+                            pending_actions.append(('wait', {'time': wait_time}))
+                        line_number += 1
+                    
+                    # Process the tasks
+                    if pending_actions:
+                        wait_time = self.get_wait_time()
+                        combined_results = []
+
+                        for pending_action, pending_input in pending_actions:
+                            if self.should_stop:
+                                break
+                            next_result = self.execute_tool_action(pending_action, pending_input)
+                            if next_result and next_result.get("type") != "error":
+                                combined_results.append(next_result)
+                                time.sleep(wait_time)
+                        
+                        result = {
+                            "type": "combined_action",
+                            "actions": combined_results
                         }
-                    elif "drag" in text:
-                        current_action_context = {'type': 'drag'}
-                    elif "type" in text or "enter" in text:
-                        current_action_context = {'type': 'type'}
-                    elif "scroll" in text:
-                        current_action_context = {'type': 'scroll'}
-                    elif "press" in text or "key" in text:
-                        current_action_context = {'type': 'key'}
-                    elif "switch" in text and any(lang in text for lang in ['korean', 'japanese', 'chinese']):
-                        current_action_context = {'type': 'switch_language'}
+                        pending_actions.clear()
                         
                 elif hasattr(content, 'type') and content.type == 'tool_use':
                     tool_input = getattr(content, 'input', {})

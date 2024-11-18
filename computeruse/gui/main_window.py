@@ -30,12 +30,7 @@ class ComputerInterface:
         
 
         # Check for API key using the Config class
-        api_key = self.config.get_api_key()
-        if api_key:
-            self.logger.add_entry("System", "API key found in environment.")
-            self.api_frame.api_key_var.set(api_key) 
-        else:
-            self.logger.add_entry("Warning", "API key NOT found in environment.")
+        self.api_key = self.config.get_api_key()
 
         # Create style
         self.style = create_style()
@@ -76,7 +71,13 @@ class ComputerInterface:
         # Create frames
         self.api_frame = APIFrame(left_panel, self)
         self.api_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
-        
+        if self.api_key:
+            self.logger.add_entry("System", "API key found in environment.")
+            self.api_frame.api_key_var.set(self.api_key) 
+        else:
+            self.logger.add_entry("Warning", "API key NOT found in environment.")
+
+
         self.options_frame = OptionsFrame(left_panel, self)
         self.options_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
@@ -195,8 +196,7 @@ class ComputerInterface:
             
             # Create and send initial message
             initial_message = self.interface.create_message_with_screenshot(
-                f"Task to complete: {prompt}\n"
-                f"Please proceed with the necessary actions to complete this task."
+                f"Task to complete: {prompt}\n" + self.interface.create_system_prompt()
             )
             
             self.interface.conversation_history.append(initial_message)
