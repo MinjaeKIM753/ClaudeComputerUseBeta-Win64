@@ -269,37 +269,10 @@ class PreviewFrame(ttk.LabelFrame):
             self.preview_label.configure(image=photo)
             self.preview_label.image = photo
             
-            # Clear previous markers
-            self.clear_markers()
             
         except Exception as e:
             self.controller.logger.add_entry("Error", f"Preview update failed: {str(e)}")
-    
-    def add_coordinate_marker(self, x: float, y: float, color: str = "red", 
-                            label: str = "") -> None:
-        """Add a coordinate marker to the overlay"""
-        if self.controller.debug_mode.get():
-            marker = self.overlay.create_oval(
-                x-5, y-5, x+5, y+5,
-                outline=color,
-                width=2
-            )
-            if label:
-                text = self.overlay.create_text(
-                    x+10, y-10,
-                    text=label,
-                    fill=color,
-                    anchor="w"
-                )
-                self.markers.extend([marker, text])
-            else:
-                self.markers.append(marker)
-    
-    def clear_markers(self) -> None:
-        """Clear all coordinate markers"""
-        for marker in self.markers:
-            self.overlay.delete(marker)
-        self.markers.clear()
+
     
     def on_mouse_move(self, event: tk.Event) -> None:
         """Handle mouse movement over preview"""

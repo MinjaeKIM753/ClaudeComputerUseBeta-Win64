@@ -92,7 +92,7 @@ Write your prompt in the input box and press Submit.
 
 - Coordinate accuracy falls for higher resolutions (Approx 1280X720 is tested good).
 
-- Attempts to reduce the number of tokens taken to complete the goal.
+- **Attempts to reduce the number of tokens taken to complete the goal.** - Revising the Response processing!
 
 ## Upcoming Features
 
@@ -105,6 +105,7 @@ Write your prompt in the input box and press Submit.
 - ~~Add actions (double clicking, scrolling, waiting, right clicking, dragging, special keys(changing typing language))~~ (Nov 1st)
 - ~~Improve memory lag (Currently, it reflects the previous task and the first task. This is to prevent hallucinations and repetitions.)~~ (Nov 1st)
 - ~~Load API key by environment varaible~~ (Nov 3rd)
+- ~~Corrected malfunctioning of mouse coordinate logging~~ (Nov 19th)
 
 ## Known Errors
 

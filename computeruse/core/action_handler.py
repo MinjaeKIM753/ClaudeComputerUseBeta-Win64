@@ -66,8 +66,8 @@ class ActionHandler:
                 'double_click': self._handle_double_click,
                 'drag': self._handle_drag,
                 'type': self._handle_type,
-                'key': self._handle_key,
-                'scroll': self._handle_scroll,
+                'key_press': self._handle_key_press,
+                'mouse_scroll': self._handle_mouse_scroll,
                 'wait': self._handle_wait
             }
 
@@ -113,7 +113,7 @@ class ActionHandler:
             screenshot.save(
                 buffered,
                 format="JPEG",
-                quality=self.config.get_setting('screenshot_quality', 60),
+                quality=self.config.get_setting('screenshot_quality', 90),
                 optimize=True
             )
             
@@ -155,15 +155,15 @@ class ActionHandler:
             target_x = float(coordinates[0]) * (1.0 / scale)  # Scale up
             target_y = float(coordinates[1]) * (1.0 / scale)  # Scale up
             
-            # Validate bounds
-            target_x = max(0, min(target_x, self.native_width - 1))
-            target_y = max(0, min(target_y, self.native_height - 1))
-            
             self.logger.add_entry("Debug", 
                 f"Mouse move: Claude({coordinates[0]}, {coordinates[1]}) -> "
                 f"Native({target_x:.0f}, {target_y:.0f}) "
                 f"[scale: {scale:.1f}, upscale: {1.0/scale:.1f}x]"
             )
+
+            # Validate bounds
+            target_x = max(0, min(target_x, self.native_width - 1))
+            target_y = max(0, min(target_y, self.native_height - 1))
             
             # Move mouse
             duration = 0 if self.config.get_setting('teleport_mouse', False) else 0.5
@@ -274,7 +274,17 @@ class ActionHandler:
     def _handle_type(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         try:
             text = tool_input.get('text', '')
+            # Change keyboard layout to English before typing
+            if any(ord(c) < 128 for c in text):  # Check if text contains English characters
+                pyautogui.hotkey('alt', 'shift')  # Toggle to English keyboard
+                time.sleep(0.2)  # Wait for keyboard switch
+            
             pyautogui.write(text, interval=0.1)
+            
+            # Reset keyboard layout if needed
+            if any(ord(c) < 128 for c in text):
+                pyautogui.hotkey('alt', 'shift')  # Toggle back to original keyboard
+                time.sleep(0.2)
             self.logger.add_entry("System", f"Typed: {text}")
             
             return {
@@ -285,7 +295,7 @@ class ActionHandler:
             self.logger.add_entry("Error", f"Type failed: {str(e)}")
             return {"type": "error", "error": str(e)}
 
-    def _handle_key(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_key_press(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         try:
             key = tool_input.get('text', '')
             pyautogui.press(key)
@@ -299,7 +309,7 @@ class ActionHandler:
             self.logger.add_entry("Error", f"Key press failed: {str(e)}")
             return {"type": "error", "error": str(e)}
 
-    def _handle_scroll(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_mouse_scroll(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         try:
             amount = int(tool_input.get('amount', 0))
             pyautogui.scroll(amount)

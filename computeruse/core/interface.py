@@ -1,6 +1,7 @@
 # computeruse/core/interface.py
 import time
 import json
+import platform as pf
 from anthropic import Anthropic
 import pyautogui
 from typing import Optional, Dict, List, Any
@@ -42,23 +43,53 @@ class Interface:
         self.update_scaling_factors()
 
     def create_system_prompt(self) -> str: # FOR FUTURE USE
-        """Create a system prompt to structure Claude's responses"""
-        return """With given current windows screenshot, Please provide responses in the following format only:
-1. No unnecessary explanations or words other than the actions and parameters below.
-2. List actions needed in order using numbers on this current stage of windows screenshot:
+        """
+        Create a system prompt to structure Claude's responses
+        """
+        os_name = pf.system()
+        if os_name == "Windows":
+            os_version = pf.win32_ver()[0]
+            platform_name = f"{os_name} {os_version}"
+        elif os_name == "Darwin":
+            os_version = pf.mac_ver()[0]
+            platform_name = f"MacOS {os_version}"
+        else:
+            os_version = pf.freedesktop_os_release()["VERSION_ID"]
+            platform_name = f"{os_name} {os_version}"
+        
+        return f"""With the provided current latest screenshot on the {platform_name} platform, please provide responses in the following format only.
+Requirement:
+- No unnecessary explanations or words other than the actions and parameters below.
+- If you observe from the current latest screenshot that the task is **completed**, you must respond with the following:
+   [completed] : indicator for the completion of the task. Presence of this will terminate immediately.
+- If the task is **not completed**, List actions needed based on the latest screenshot in order using numbers. You must stop at where you are not certain of the situation (for example, absence of software). unfinished task will be continued in next request.:
    1. Action description
+   <Indicate purpose of the action above here, in 1 sentence>
    2. Next action
-3. Specify exact action type in [brackets] at start of each line, '< >' indicates the parameter required.:
-   [move]<X-Coord,Y-Coord> : coordinates for mouse movement
-   [click] : for single left-clicking at current coordinate.
-   [double_click] : for double left-clicking at current coordinate.
-   [right_click] : for right-clicking at current coordinate.
-   [mouse_scroll]<amount> : for mouse scrolling at current coordinate, specify with unit amount of scroll. 
-   [screenshot] : for taking screenshot of the current window.
+   <Indicate purpose of the action above here, in 1 sentence>
+   3. ...
+- If there are actions that require "waiting for ~ result", you should skip those actions and any subsequent actions. These should be evaluated in the next conversation with an updated screenshot to properly verify the results.
+
+Here are the action formats for you to reference if the task is **not completed**:
+Specify exact action type in [brackets] at start of each line, '< >' indicates the parameter required.:
+   [move]<X-Coord,Y-Coord> : coordinates for mouse movement. Please be very sensitive and exact to the coordinate and resolution. Beware of the mouse coordinate located at intended and correct location.
+   [click] : for single left-clicking at current mouse coordinate. **Beware of the mouse coordinate located at intended and correct location**.
+   [double_click] : for double left-clicking at current mouse coordinate. Beware of the mouse coordinate located at intended and correct location.
+   [right_click] : for right-clicking at current mouse coordinate. Beware of the mouse coordinate located at intended and correct location.
+   [mouse_scroll]<amount> : for mouse scrolling at current mouse coordinate, specify with unit amount of scroll. 
+   [screenshot] : for taking screenshot of the current window. The latest screenshot before actions is already given to you.
    [type]"<text>" : for typing text.
-   [key_press]<key> :  for keyboard shortcuts and special keys.
+   [key_press]<key> :  for keyboard shortcuts and special keys. This includes return key and special keys for corresponding operating system.
    [drag]<X-Coord,Y-Coord> : for drag operations, specify with destination coordinate
-   [wait]<time> : for stopping operation, specify with number of seconds to wait."""
+   [wait]<time> : for stopping operation, specify with number of seconds to wait.
+
+Reminder: 
+**Your Utmost important part is to accurately provide coordinates for the actions that requires it.**
+You should adequately place [wait]<time> in between actions to wait for the actions to complete. For example: 
+    - After [click] to open up a software or webpage, you may need some seconds to wait for it to open successfully.
+You should be screenshot-resolution sensitive for [move] and [drag]. Please check screenshot resolution every time. 
+To click on target, you must [move] to the coordinate and then [click].
+   """
 
     def get_wait_time(self) -> float:
         """Get the current wait time between actions"""
@@ -262,37 +293,27 @@ class Interface:
 
             self.current_iteration += 1
             self.logger.add_entry("Debug", f"Iteration {self.current_iteration}/{self.max_iterations}")
-
-            # Track completion indicators
-            goal_indicators = [
-                "completed", "finished", "done", "accomplished",
-                "success", "achieved", "ready", "set up"
-            ]
             
             task_progress = []
             pending_actions = []
-            current_action_context = None
 
             # First pass: Analyze text responses and build action context
             for content in response.content:
                 if hasattr(content, 'text'):
                     text = content.text.lower()
                     
-                    # Track goal progress
-                    if any(indicator in text for indicator in goal_indicators):
-                        task_progress.append({
-                            'timestamp': time.time(),
-                            'indicators': [i for i in goal_indicators if i in text],
-                            'text': text
-                        })
-                    
                     # Update conversation history (do this only once)
                     self.conversation_history.append({
                         "role": "assistant",
                         "content": [{"type": "text", "text": content.text}]
                     })
-                    #self.logger.add_entry("Claude", content.text)
+                    self.logger.add_entry("Claude", content.text)
 
+                    print(text)
+
+                    if '[completed]' in text:
+                        self.logger.add_entry("System", f"Claude terminated conversation due to task completion.")
+                        self.task_complete = True
                     
                     # Identifying the Tasks in order
                     line_number = 1
@@ -322,17 +343,19 @@ class Interface:
                             pending_actions.append(('type', {'text': text_to_type}))
                         elif '[key_press]' in line:
                             key_to_press = line.replace('[key_press]', '').strip().replace('<', '').replace('>', '')
-                            pending_actions.append(('key_press', {'key': key_to_press}))
+                            pending_actions.append(('key_press', {'text': key_to_press}))
                         elif '[drag]' in line:
                             drag_coordinates = line.replace('[drag]', '').strip().replace('<', '').replace('>', '')
                             x, y = map(float, drag_coordinates.split(','))
                             pending_actions.append(('drag', {'coordinate': [x, y]}))
                         elif '[wait]' in line:
                             wait_time = line.replace('[wait]', '').strip().replace('<', '').replace('>', '')
-                            pending_actions.append(('wait', {'time': wait_time}))
+                            pending_actions.append(('wait', {'duration': wait_time}))
                         line_number += 1
                     
+                    
                     # Process the tasks
+                    result = None
                     if pending_actions:
                         wait_time = self.get_wait_time()
                         combined_results = []
@@ -343,88 +366,80 @@ class Interface:
                             next_result = self.execute_tool_action(pending_action, pending_input)
                             if next_result and next_result.get("type") != "error":
                                 combined_results.append(next_result)
-                                time.sleep(wait_time)
                         
                         result = {
                             "type": "combined_action",
                             "actions": combined_results
                         }
                         pending_actions.clear()
-                        
-                elif hasattr(content, 'type') and content.type == 'tool_use':
-                    tool_input = getattr(content, 'input', {})
-                    action = tool_input.get('action', '')
-                    if action:
-                        # Execute primary action (once)
-                        self.logger.add_entry("Tool", f"Executing: {action}")
-                        result = self.execute_tool_action(action, tool_input)
-                        if result.get("type") != "error":
-                            # If we have a context and it matches the action, prepare follow-up actions
-                            if current_action_context:
-                                if action == 'mouse_move':
-                                    if current_action_context['type'] == 'click':
-                                        if current_action_context.get('double'):
-                                            pending_actions.append(('double_click', {}))
-                                        elif current_action_context.get('right'):
-                                            pending_actions.append(('right_click', {}))
-                                        else:
-                                            pending_actions.append(('left_click', {}))
-                                    elif current_action_context['type'] == 'drag':
-                                        pending_actions.append(('drag', {}))
-                            
-                            # Execute pending actions (once each)
-                            if pending_actions:
-                                wait_time = self.get_wait_time()
-                                combined_results = [result]
-                                
-                                for pending_action, pending_input in pending_actions:
-                                    if self.should_stop:
-                                        break
-                                    time.sleep(wait_time)
-                                    next_result = self.execute_tool_action(pending_action, pending_input)
-                                    if next_result and next_result.get("type") != "error":
-                                        combined_results.append(next_result)
-                                
-                                result = {
-                                    "type": "combined_action",
-                                    "actions": combined_results
-                                }
-                                pending_actions.clear()
+                    
+                    # Take a new screenshot after actions if there were no screenshots taken
+                    if pending_actions and pending_actions[-1][0] != 'screenshot':
+                        time.sleep(self.get_wait_time())
+                        self.execute_tool_action('screenshot', {})
 
-                            # Take a new screenshot after actions
-                            time.sleep(self.get_wait_time())
-                            screenshot_result = self.execute_tool_action('screenshot', {})
-                            
-                            if not self.should_stop:
-                                # Prepare next message with current state
-                                next_message = {
-                                    "role": "user",
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": (
-                                                f"Your current task is: {self.current_task}\n"
-                                                f"Action completed: {json.dumps(result)}. "
-                                                "Please verify if the task is completed. If not, continue with the necessary actions."
-                                            )
-                                        },
-                                        {
-                                            "type": "image",
-                                            "source": {
-                                                "type": "base64",
-                                                "media_type": "image/jpeg",
-                                                "data": self.current_screenshot["image_data"]
-                                            }
-                                        }
-                                    ]
+                    if not self.should_stop:
+                        # Prepare next message with current state
+                        next_message = {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": (
+                                        f"Your current task is: {self.current_task}\n"
+                                        f"Your previous response is: {text}"
+                                        f"Your previous action result is: {json.dumps(result)}. "
+                                        "Please verify if the task is completed. If not, continue with the necessary actions. The screenshot is the latest environment."
+                                    )
+                                },
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": "image/jpeg",
+                                        "data": self.screenshot_manager.get_current_screenshot()["image_data"]
+                                    }
                                 }
-                                # Continue conversation
-                                try:
-                                    new_response = self.client.beta.messages.create(
+                            ]
+                        }
+                        # Continue conversation
+                        try:
+                            new_response = self.client.beta.messages.create(
+                                model="claude-3-5-sonnet-20241022",
+                                max_tokens=512,
+                                temperature=0,
+                                messages=self.conversation_history + [next_message],
+                                tools=[{
+                                    "type": "computer_20241022",
+                                    "name": "computer",
+                                    "display_width_px": self.target_width,
+                                    "display_height_px": self.target_height,
+                                    "display_number": 1
+                                }],
+                                betas=["computer-use-2024-10-22"]
+                            )
+                            self.process_response(new_response) #LOOP
+                            
+                        except Exception as api_error:
+                            if "safety reasons" in str(api_error):
+                                if not self.should_stop:
+                                    self.logger.add_entry("System", "Retrying without screenshot...")
+                                    # Remove screenshot content
+                                    filtered_messages = [
+                                        {
+                                            "role": msg["role"],
+                                            "content": [
+                                                c for c in msg["content"]
+                                                if c["type"] == "text"
+                                            ]
+                                        }
+                                        for msg in self.conversation_history + [next_message]
+                                    ]
+                                    retry_response = self.client.beta.messages.create(
                                         model="claude-3-5-sonnet-20241022",
                                         max_tokens=1024,
                                         temperature=0,
-                                        messages=self.conversation_history + [next_message],
+                                        messages=filtered_messages,
                                         tools=[{
                                             "type": "computer_20241022",
                                             "name": "computer",
@@ -434,55 +449,9 @@ class Interface:
                                         }],
                                         betas=["computer-use-2024-10-22"]
                                     )
-                                    self.process_response(new_response)
-                                    
-                                except Exception as api_error:
-                                    if "safety reasons" in str(api_error):
-                                        if not self.should_stop:
-                                            self.logger.add_entry("System", "Retrying without screenshot...")
-                                            # Remove screenshot content
-                                            filtered_messages = [
-                                                {
-                                                    "role": msg["role"],
-                                                    "content": [
-                                                        c for c in msg["content"]
-                                                        if c["type"] == "text"
-                                                    ]
-                                                }
-                                                for msg in self.conversation_history + [next_message]
-                                            ]
-                                            retry_response = self.client.beta.messages.create(
-                                                model="claude-3-5-sonnet-20241022",
-                                                max_tokens=1024,
-                                                temperature=0,
-                                                messages=filtered_messages,
-                                                tools=[{
-                                                    "type": "computer_20241022",
-                                                    "name": "computer",
-                                                    "display_width_px": self.target_width,
-                                                    "display_height_px": self.target_height,
-                                                    "display_number": 1
-                                                }],
-                                                betas=["computer-use-2024-10-22"]
-                                            )
-                                            self.process_response(retry_response)
-                                    else:
-                                        raise api_error
-
-            # Check for task completion
-            if len(task_progress) >= 2:
-                time_diff = task_progress[-1]['timestamp'] - task_progress[0]['timestamp']
-                if time_diff > 5.0:
-                    common_indicators = set.intersection(
-                        *[set(p['indicators']) for p in task_progress]
-                    )
-                    if common_indicators:
-                        self.task_complete = True
-                        self.logger.add_entry(
-                            "System", 
-                            f"Task completion detected with indicators: {', '.join(common_indicators)}"
-                        )
-                        return
+                                    self.process_response(retry_response)
+                            else:
+                                raise api_error
 
         except Exception as e:
             self.logger.add_entry("Error", f"Error processing response: {str(e)}")
@@ -492,7 +461,6 @@ class Interface:
         """Execute a tool action using the action handler"""
         try:
             # Log the incoming action request
-            
             self.logger.add_entry("Debug", f"Action request - Action: {action}, Input: {json.dumps(tool_input)}")
             
             # Execute the action using the handler

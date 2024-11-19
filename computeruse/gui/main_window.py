@@ -1,5 +1,6 @@
 # computeruse/gui/main_window.py
 import tkinter as tk
+import pyautogui
 from tkinter import ttk, messagebox
 from typing import Optional
 import threading
@@ -115,9 +116,7 @@ class ComputerInterface:
         """Update coordinate display in debug frame"""
         if self.debug_mode.get():
             try:
-                x, y = self.root.winfo_pointerxy()
-                screen_x = x - self.root.winfo_rootx()
-                screen_y = y - self.root.winfo_rooty()
+                screen_x, screen_y = pyautogui.position()
                 
                 downscale = self.options_frame.downscale_var.get()
                 scaled_x = int(screen_x * downscale)
@@ -196,7 +195,7 @@ class ComputerInterface:
             
             # Create and send initial message
             initial_message = self.interface.create_message_with_screenshot(
-                f"Task to complete: {prompt}\n" + self.interface.create_system_prompt()
+                f"Task to complete: {prompt}\nYou are now given the latest screenshot for the current state." + self.interface.create_system_prompt()
             )
             
             self.interface.conversation_history.append(initial_message)
