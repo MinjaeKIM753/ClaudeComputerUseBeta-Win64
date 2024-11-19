@@ -12,6 +12,7 @@ For Macos Demo Computer Use, please visit [PallavAg's Repo](https://github.com/P
 
 **This repo is made to run on Windows but are large part compatible for other major operating systems.** Any participation is welcome, please let me know if there are issues or advices. 
 
+This repo manually implements user tools, whereas the [claude tools](https://docs.anthropic.com/en/docs/build-with-claude/tool-use) are subject to update in later stage. 
 
 ## Installation and Setup
 
@@ -82,7 +83,7 @@ Write your prompt in the input box and press Submit.
 
 - Downscale : Downscale factor for the screenshots. __(Practically, 0.5 is believed to perform best.)__
 
-- Action Delay : Time for delay in between each actions. __(Practically, 3.0 seconds is good enough)__
+- Action Delay : Time for delay in between each conversation. __(Practically, 3.0 seconds is good enough)__
 
 - Coordinate Debug : For reference.
 
@@ -92,13 +93,15 @@ Write your prompt in the input box and press Submit.
 
 - Coordinate accuracy falls for higher resolutions (Approx 1280X720 is tested good).
 
-- **Attempts to reduce the number of tokens taken to complete the goal.** - Revising the Response processing!
-
 ## Upcoming Features
 
 - Improve GUI
 
 - Prompt format Claude responses for better accuracy
+
+- [Prompt Caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching)
+
+- [Claude Tools](https://docs.anthropic.com/en/docs/build-with-claude/tool-use)
 
 ## Updated Features
 

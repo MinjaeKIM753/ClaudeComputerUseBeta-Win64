@@ -60,9 +60,10 @@ class Interface:
         return f"""With the provided current latest screenshot on the {platform_name} platform, please provide responses in the following format only.
 Requirement:
 - No unnecessary explanations or words other than the actions and parameters below.
-- If you observe from the current latest screenshot that the task is **completed**, you must respond with the following:
+- If you observe from the current latest screenshot that the task is **completed**, you must respond with the following (Beware of the operating system differences and whether the Dark Mode is applied):
    [completed] : indicator for the completion of the task. Presence of this will terminate immediately.
 - If the task is **not completed**, List actions needed based on the latest screenshot in order using numbers. You must stop at where you are not certain of the situation (for example, absence of software). unfinished task will be continued in next request.:
+   location of the window icon in bottom task bar is : <X-Coord,Y-Coord>
    1. Action description
    <Indicate purpose of the action above here, in 1 sentence>
    2. Next action
@@ -73,7 +74,7 @@ Requirement:
 Here are the action formats for you to reference if the task is **not completed**:
 Specify exact action type in [brackets] at start of each line, '< >' indicates the parameter required.:
    [move]<X-Coord,Y-Coord> : coordinates for mouse movement. Please be very sensitive and exact to the coordinate and resolution. Beware of the mouse coordinate located at intended and correct location.
-   [click] : for single left-clicking at current mouse coordinate. **Beware of the mouse coordinate located at intended and correct location**.
+   [click] : for single left-clicking at current 2ouse coordinate. **Beware of the mouse coordinate located at intended and correct location**.
    [double_click] : for double left-clicking at current mouse coordinate. Beware of the mouse coordinate located at intended and correct location.
    [right_click] : for right-clicking at current mouse coordinate. Beware of the mouse coordinate located at intended and correct location.
    [mouse_scroll]<amount> : for mouse scrolling at current mouse coordinate, specify with unit amount of scroll. 
@@ -83,12 +84,33 @@ Specify exact action type in [brackets] at start of each line, '< >' indicates t
    [drag]<X-Coord,Y-Coord> : for drag operations, specify with destination coordinate
    [wait]<time> : for stopping operation, specify with number of seconds to wait.
 
-Reminder: 
+Reminder:
+You should identify the content inside the screenshot to give your decision on action listing. 
 **Your Utmost important part is to accurately provide coordinates for the actions that requires it.**
 You should adequately place [wait]<time> in between actions to wait for the actions to complete. For example: 
     - After [click] to open up a software or webpage, you may need some seconds to wait for it to open successfully.
 You should be screenshot-resolution sensitive for [move] and [drag]. Please check screenshot resolution every time. 
 To click on target, you must [move] to the coordinate and then [click].
+
+Output example (ex,, given prompt = "Open Calculator and perform 2+2" with 1280x720. You SHOULD use coordinates according to the given screenshot and its resolution.):
+location of the window icon in bottom task bar is : <506,707>
+1. [move]<506,707>
+to move cursor to windows start button
+2. [click]
+to open start menu
+3. [type]"calculator"
+to search for calculator
+4. [key_press]return
+to launch calculator
+5. [wait]2
+to wait for calculator to open
+6. [type]"2+2="
+to get the result
+7. [screenshot]
+to verify the calculation result
+
+Output example (ex,, when latest screenshot is observed to indicate the completion of task)
+[completed]
    """
 
     def get_wait_time(self) -> float:
@@ -118,7 +140,6 @@ To click on target, you must [move] to the coordinate and then [click].
         """Test the connection to Anthropic API"""
         if not self.client:
             return False
-            
         try:
             self.client.beta.messages.create(
                 model="claude-3-5-sonnet-20241022",
@@ -147,7 +168,6 @@ To click on target, you must [move] to the coordinate and then [click].
             current_screenshot = self.screenshot_manager.get_current_screenshot()
             if not current_screenshot:
                 raise Exception("No screenshot available")
-                
             # Get current scale factor and dimensions
             downscale = float(self.config.get_setting('downscale_factor'))
             target_width = int(self.native_width * downscale)
@@ -168,7 +188,7 @@ To click on target, you must [move] to the coordinate and then [click].
                 "content": [
                     {
                         "type": "text",
-                        "text": f"{text}\n{screen_info}"
+                        "text": f"{text}"
                     },
                     {
                         "type": "image",
@@ -208,13 +228,13 @@ To click on target, you must [move] to the coordinate and then [click].
         
         response = self.client.beta.messages.create(
             model="claude-3-5-sonnet-20241022",
-            max_tokens=1024,
+            max_tokens=2048,
             temperature=0,
             messages=messages,
             tools=[{
                 "type": "computer_20241022",
                 "name": "computer",
-                "display_width_px": target_width,  # Send scaled dimensions to Claude
+                "display_width_px": target_width,
                 "display_height_px": target_height,
                 "display_number": 1
             }],
@@ -309,11 +329,12 @@ To click on target, you must [move] to the coordinate and then [click].
                     })
                     self.logger.add_entry("Claude", content.text)
 
-                    print(text)
+                    #print(text)
 
                     if '[completed]' in text:
                         self.logger.add_entry("System", f"Claude terminated conversation due to task completion.")
                         self.task_complete = True
+                        break
                     
                     # Identifying the Tasks in order
                     line_number = 1

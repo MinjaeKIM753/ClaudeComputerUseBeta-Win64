@@ -2,6 +2,7 @@
 import pyautogui
 from typing import Dict, Any, Optional
 import time
+import platform
 from PIL import Image
 from io import BytesIO
 import base64
@@ -271,29 +272,74 @@ class ActionHandler:
                     pass
             return {"type": "error", "error": str(e)}
 
+    def detect_current_language(self, text: str) -> str:
+        """
+        텍스트의 언어를 감지
+        간단한 구현 예시 - 실제로는 더 복잡한 로직이 필요할 수 있음
+        """
+        # Check Korean
+        if any(ord('가') <= ord(c) <= ord('힣') for c in text):
+            return 'ko'
+        # Check Japanese
+        elif any(ord('ぁ') <= ord(c) <= ord('ヿ') for c in text):
+            return 'ja'
+        # Check Chinese
+        elif any(ord('一') <= ord(c) <= ord('龯') for c in text):
+            return 'zh'
+        # Regard else English
+        else:
+            return 'en'
+
     def _handle_type(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         try:
             text = tool_input.get('text', '')
-            # Change keyboard layout to English before typing
-            if any(ord(c) < 128 for c in text):  # Check if text contains English characters
-                pyautogui.hotkey('alt', 'shift')  # Toggle to English keyboard
-                time.sleep(0.2)  # Wait for keyboard switch
+            target_lang = tool_input.get('language', 'en')  # English as Default
+            os_type = platform.system()
             
-            pyautogui.write(text, interval=0.1)
-            
-            # Reset keyboard layout if needed
-            if any(ord(c) < 128 for c in text):
-                pyautogui.hotkey('alt', 'shift')  # Toggle back to original keyboard
+            def switch_keyboard_layout():
+                """
+                Change Language Setting
+                """
+                if os_type == 'Windows':
+                    if target_lang == 'ko':  # Korean
+                        pyautogui.press('hangul')
+                    elif target_lang == 'ja':  # Japanese
+                        pyautogui.hotkey('alt', '`')
+                    elif target_lang == 'zh':  # Chinese
+                        pyautogui.hotkey('ctrl', 'space')
+                    else:  # Others
+                        pyautogui.hotkey('alt', 'shift')
+                        
+                elif os_type == 'Darwin':  # macOS
+                    if target_lang in ['ko', 'ja', 'zh']:
+                        pyautogui.hotkey('command', 'space')
+                        time.sleep(0.2)
+                        
+                elif os_type == 'Linux':
+                    pyautogui.hotkey('alt', 'shift')
+                
                 time.sleep(0.2)
-            self.logger.add_entry("System", f"Typed: {text}")
+            
+            # Change language setting if the current setting is different from the target.
+            current_lang = self.detect_current_language(text) 
+            if current_lang != target_lang:
+                switch_keyboard_layout()
+            
+            # Write
+            pyautogui.write(text, interval=0.1)
+            self.logger.add_entry("System", f"Typed: {text} (Language: {target_lang})")
             
             return {
                 "type": "type",
-                "text": text
+                "text": text,
+                "language": target_lang,
+                "os": os_type
             }
+        
         except Exception as e:
-            self.logger.add_entry("Error", f"Type failed: {str(e)}")
-            return {"type": "error", "error": str(e)}
+            error_msg = f"Type failed on {os_type}: {str(e)}"
+            self.logger.add_entry("Error", error_msg)
+            return {"type": "error", "error": error_msg}
 
     def _handle_key_press(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         try:
